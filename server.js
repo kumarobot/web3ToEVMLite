@@ -6,6 +6,8 @@ const env = require('./env');
 const request = require('request');
 const moment = require('moment');
 const EthereumTx = require('ethereumjs-tx')
+const Web3 = require('web3');
+const web3 = new Web3(new Web3.providers.HttpProvider('http://localhost:8545'));
 var txDecoder = require('ethereum-tx-decoder');
 
 var evmliteAPI = 'http://' + env.apiHost + ':' + env.evmlitePort;
@@ -43,10 +45,10 @@ const server = jayson.server({
       }
     });
   },
-  eth_blockNumber: (args, callback) => {
+  eth_blockNumber: (args, callback) =>  {
     // web3.eth.getBlockNumber
     console.log("GET /getBlockNumber");
-    request.get(tendermintAPI + '/block', (err, res) => {
+    request.get(tendermintAPI + '/block?height=', (err, res) => {
       if (err) {
         console.log(err);
       } else {
@@ -194,6 +196,70 @@ const server = jayson.server({
       }
     });
   },
+  eth_getTransactionByHash: (args, callback) =>{
+    //web3.eth.getTransaction
+    console.log("POST /getTransaction");
+    console.log("txHash: " + args[0]);
+    request.get(tendermintAPI + '/tx?hash=' + args[0], (err, res) => {
+    if (err){
+      console.log(err);
+    } else {
+      try{
+      var body = JSON.parse(res.body);
+      request.get(tendermintAPI + '/block?height=' + body.result.height, (err, res) => {
+      if (err){
+        console.log(err)
+      } else {
+	try{
+        var blockResult = JSON.parse(res.body).result.block_meta.block_id;
+        var data64 = body.result.tx;
+        const buffer = Buffer.from(data64, 'base64');
+        const rawtx = '0x' + buffer.toString('hex');
+        //console.log('rawtx:', rawtx);
+        var decodedTx = txDecoder.decodeTx(rawtx);
+        //console.log('transaction object: ');
+        //console.log(decodedTx);
+        var nonce = parseInt(decodedTx.nonce, 16) || 0;
+        var from = web3.eth.accounts.recoverTransaction(rawtx);
+        var to = decodedTx.to;
+        var value = decodedTx.value.toString(16);
+        var gas = parseInt(decodedTx.gasLimit, 16) || 0;
+        var gasPrice = decodedTx.gasPrice.toString(16);
+        var input = decodedTx.data;
+        var getResult = {
+        hash: body.result.hash,
+        nonce: nonce,
+        blockHash: blockResult.hash,
+        blockNumber: body.result.height,
+        transactionIndex: body.result.index,
+        from: from,
+        to: to,
+        value: value,
+        gas: gas,
+        gasPrice: gasPrice,
+        input: input
+        }
+
+	callback(null, getResult);
+        } catch{
+	  console.log(err);
+	  callback(null, res.body);
+	}
+    }
+    
+    })
+    } catch (err) {
+      console.log(err)
+      callback(null, res.body);
+    }
+    }
+    })
+
+
+
+
+
+
   }
   // , {
   //   router: (method, params) => {
@@ -203,7 +269,10 @@ const server = jayson.server({
   //     console.log(params)
   //   }
   // }
-);
+});
+
+//tmHash to ethHash
+
   
 // parse request body before the jayson middleware
 app.use(bodyParser.urlencoded({extended: true}))

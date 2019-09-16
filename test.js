@@ -2,6 +2,14 @@ const Web3 = require('web3');
 const web3 = new Web3(new Web3.providers.HttpProvider('http://localhost:8545'));
 const EthereumTx = require('ethereumjs-tx')
 
+var tmHash = '0x98f66e46c3ca92d5079eba1d6f3d84a9601f48a9a108b0924ed6a37c17a57489';
+
+//web3.eth.getBlockNumber().then(console.log);  
+//console.log('num', num);
+web3.eth.getTransaction(tmHash).then((data) => {
+console.log(data);
+})
+//console.log('result', r);
 // web3.eth.net.isListening().then(console.log);
 
 // web3.eth.getCoinbase().then(console.log);
